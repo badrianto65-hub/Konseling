@@ -38,7 +38,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </span>
               </div>
               <p className="text-[11px] text-indigo-200 hidden sm:block font-medium">
-                Sistem Bimbingan Konseling Digital Terpadu
+                Dikelola oleh Guru BK: <span className="font-bold text-amber-300">badrianto65@guru.smp.belajar.id</span> (Badrianto, S.Pd.)
               </p>
             </div>
           </div>

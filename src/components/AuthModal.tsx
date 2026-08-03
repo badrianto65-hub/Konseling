@@ -15,7 +15,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onLogin, isOpen }) => {
   const [kelas, setKelas] = useState('8A');
   const [absen, setAbsen] = useState('01');
   const [nisn, setNisn] = useState('');
-  const [selectedPreset, setSelectedPreset] = useState<string | null>('badrianto65@guru.smp.belajar.id');
   const [error, setError] = useState<string | null>(null);
   const [targetRole, setTargetRole] = useState<UserRole>('server_guru');
   const [isSimulatingGoogleAuth, setIsSimulatingGoogleAuth] = useState(false);
@@ -48,44 +47,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onLogin, isOpen }) => {
   }, []);
 
   if (!isOpen) return null;
-
-  const presetAccounts = [
-    {
-      role: 'server_guru' as UserRole,
-      name: 'Badrianto, S.Pd.',
-      email: 'badrianto65@guru.smp.belajar.id',
-      badge: 'Guru BK Whitelisted',
-      desc: 'Akun Tunggal Konselor / Guru BK - Akses Server'
-    },
-    {
-      role: 'client_siswa' as UserRole,
-      name: 'Dina Nurhaliza',
-      email: 'dina.nur@siswa.belajar.id',
-      kelas: '9C',
-      absen: '12',
-      badge: 'Siswa (Client)',
-      desc: 'Siswa Kelas 9C - Akses Aplikasi Client Konsultasi'
-    },
-    {
-      role: 'client_siswa' as UserRole,
-      name: 'Ahmad Rizky Pratama',
-      email: 'ahmad.rizky@siswa.belajar.id',
-      kelas: '8A',
-      absen: '02',
-      badge: 'Siswa (Client)',
-      desc: 'Siswa Kelas 8A - Akses Aplikasi Client Konsultasi'
-    }
-  ];
-
-  const handleSelectPreset = (acc: typeof presetAccounts[0]) => {
-    setSelectedPreset(acc.email);
-    setEmail(acc.email);
-    setName(acc.name);
-    setTargetRole(acc.role);
-    if (acc.kelas) setKelas(acc.kelas);
-    if (acc.absen) setAbsen(acc.absen);
-    setError(null);
-  };
 
   const handleGoogleSignInClick = () => {
     setIsSimulatingGoogleAuth(true);
@@ -267,48 +228,24 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onLogin, isOpen }) => {
             </div>
           </div>
 
-          {/* Quick Select Presets */}
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-black text-slate-950 uppercase tracking-widest">
-                2. Pilih Akun Google Terdaftar (Demo / Test)
-              </span>
+          {/* Information Banner - Administrator / Manager info */}
+          <div className="mb-6 p-4 bg-indigo-50 border-3 border-slate-900 rounded-2xl shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] flex items-start gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-indigo-600 border-2 border-slate-900 text-white flex items-center justify-center shrink-0 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)]">
+              <ShieldCheck className="w-6 h-6 text-amber-300" />
             </div>
-            <div className="space-y-2.5 max-h-44 overflow-y-auto pr-1">
-              {presetAccounts
-                .filter(a => targetRole === 'server_guru' ? a.role === 'server_guru' : true)
-                .map((acc, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => handleSelectPreset(acc)}
-                    className={`w-full text-left p-3 rounded-xl border-2 border-slate-900 transition-all flex items-center justify-between cursor-pointer ${
-                      selectedPreset === acc.email
-                        ? 'bg-indigo-50 shadow-[3px_3px_0px_0px_rgba(15,23,42,1)] font-bold'
-                        : 'bg-slate-50 hover:bg-slate-100 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)]'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-xl bg-indigo-600 border-2 border-slate-900 text-white font-black text-xs flex items-center justify-center">
-                        {acc.name.substring(0, 2).toUpperCase()}
-                      </div>
-                      <div>
-                        <div className="text-xs font-black text-slate-950 flex items-center gap-2">
-                          {acc.name}
-                          <span className={`px-2 py-0.5 text-[9px] rounded-full font-black uppercase border border-slate-900 ${
-                            acc.role === 'server_guru' ? 'bg-amber-300 text-slate-950' : 'bg-emerald-300 text-slate-950'
-                          }`}>
-                            {acc.badge}
-                          </span>
-                        </div>
-                        <div className="text-[11px] text-slate-600 font-mono font-bold">{acc.email}</div>
-                      </div>
-                    </div>
-                    {selectedPreset === acc.email && (
-                      <CheckCircle2 className="w-5 h-5 text-indigo-700 shrink-0" />
-                    )}
-                  </button>
-                ))}
+            <div>
+              <div className="text-xs font-black text-slate-950 uppercase tracking-wide">
+                Pengelola Aplikasi Server Guru BK
+              </div>
+              <div className="text-sm font-black text-indigo-950 mt-0.5">
+                Badrianto, S.Pd.
+              </div>
+              <div className="text-xs font-mono font-bold text-indigo-700 mt-0.5">
+                badrianto65@guru.smp.belajar.id
+              </div>
+              <div className="text-[11px] text-slate-600 font-medium mt-1">
+                Aplikasi ini dikelola sepenuhnya oleh konselor terdaftar di atas untuk layanan bimbingan konseling terpadu.
+              </div>
             </div>
           </div>
 
@@ -323,7 +260,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onLogin, isOpen }) => {
                 value={email}
                 onChange={(e) => {
                   setEmail(e.target.value);
-                  setSelectedPreset(null);
                   setError(null);
                 }}
                 placeholder="badrianto65@guru.smp.belajar.id atau nama@gmail.com"
