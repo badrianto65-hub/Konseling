@@ -37,112 +37,9 @@ const DEFAULT_SCHOOL: SchoolData = {
   ]
 };
 
-const DEFAULT_CONSULTATIONS: ConsultationRequest[] = [
-  {
-    id: 'req-001',
-    studentId: 's-104',
-    studentName: 'Dina Nurhaliza',
-    studentEmail: 'dina.nur@siswa.belajar.id',
-    kelas: '9C',
-    absen: '12',
-    counselorId: 'c-1',
-    counselorName: 'Badrianto, S.Pd.',
-    counselorEmail: 'badrianto65@guru.smp.belajar.id',
-    category: 'Karir',
-    title: 'Bingung Memilih Antara SMA Negeri atau SMK Kejuruan',
-    problemDescription: 'Selamat siang Bapak Badrianto, saya siswa kelas 9C merasa bingung memilih kelanjutan studi setelah lulus. Orang tua menyarankan SMA, tapi saya lebih berminat pada bidang Desain Grafis di SMK.',
-    moodToday: '😐 Biasa Aja',
-    status: 'Sedang Konseling',
-    createdAt: new Date(Date.now() - 3600000 * 24).toISOString(),
-    updatedAt: new Date(Date.now() - 1800000).toISOString(),
-    counselorNotes: 'Siswa memiliki bakat visual yang kuat. Telah disarankan tes minat bakat sederhana dan pemetaan nilai rapor semester 1-5.',
-    solutionSummary: 'Melakukan analisis SWOT pribadi bersama siswa dan menyusun rencana diskusi bersama orang tua.',
-    followUpAction: 'Jadwalkan sesi konsultasi tatap muka bersama orang tua pada hari Jumat jam 09.00 WIB.',
-    messages: [
-      {
-        id: 'm-1',
-        senderEmail: 'dina.nur@siswa.belajar.id',
-        senderName: 'Dina Nurhaliza',
-        senderRole: 'client_siswa',
-        content: 'Selamat siang Pak Badrianto, mohon bimbingannya untuk kelanjutan studi saya setelah kelas 9 ini.',
-        timestamp: new Date(Date.now() - 3600000 * 24).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        isRead: true,
-      },
-      {
-        id: 'm-2',
-        senderEmail: 'badrianto65@guru.smp.belajar.id',
-        senderName: 'Badrianto, S.Pd.',
-        senderRole: 'server_guru',
-        content: 'Selamat siang Dina! Senang sekali kamu berinisiatif berkonsultasi. Jangan khawatir, kita bisa diskusikan minat kamu di bidang Desain Grafis serta nilai akademismu untuk rekomendasi terbaik.',
-        timestamp: new Date(Date.now() - 3600000 * 20).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        isRead: true,
-      },
-      {
-        id: 'm-3',
-        senderEmail: 'dina.nur@siswa.belajar.id',
-        senderName: 'Dina Nurhaliza',
-        senderRole: 'client_siswa',
-        content: 'Terima kasih pak. Bagaimana cara meyakinkan orang tua yang menginginkan saya masuk SMA umum ya Pak?',
-        timestamp: new Date(Date.now() - 3600000 * 2).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        isRead: true,
-      }
-    ]
-  },
-  {
-    id: 'req-002',
-    studentId: 's-101',
-    studentName: 'Ahmad Rizky Pratama',
-    studentEmail: 'ahmad.rizky@siswa.belajar.id',
-    kelas: '8A',
-    absen: '02',
-    counselorId: 'c-1',
-    counselorName: 'Badrianto, S.Pd.',
-    counselorEmail: 'badrianto65@guru.smp.belajar.id',
-    category: 'Belajar',
-    title: 'Kesulitan Mengatur Waktu Belajar dan Bermain Game',
-    problemDescription: 'Pak Badrianto, nilai matematika saya menurun karena sering bergadang bermain game online bersama teman. Saya ingin memperbaiki cara belajar saya.',
-    moodToday: '😔 Sedih',
-    status: 'Menunggu Tanggapan',
-    createdAt: new Date(Date.now() - 3600000 * 3).toISOString(),
-    updatedAt: new Date(Date.now() - 3600000 * 3).toISOString(),
-    messages: [
-      {
-        id: 'm-201',
-        senderEmail: 'ahmad.rizky@siswa.belajar.id',
-        senderName: 'Ahmad Rizky Pratama',
-        senderRole: 'client_siswa',
-        content: 'Pak Badrianto, mohon bantuannya menyusun jadwal harian agar nilai saya tidak anjlok lagi.',
-        timestamp: new Date(Date.now() - 3600000 * 3).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        isRead: false,
-      }
-    ]
-  }
-];
+const DEFAULT_CONSULTATIONS: ConsultationRequest[] = [];
 
-const DEFAULT_MOODS: MoodEntry[] = [
-  {
-    id: 'md-1',
-    studentEmail: 'dina.nur@siswa.belajar.id',
-    studentName: 'Dina Nurhaliza',
-    kelas: '9C',
-    date: new Date().toISOString().split('T')[0],
-    time: '07:30',
-    moodScore: 4,
-    moodLabel: '🙂 Baik',
-    notes: 'Merasa lebih tenang setelah mengirimkan masalah konsultasi ke Guru BK.'
-  },
-  {
-    id: 'md-2',
-    studentEmail: 'ahmad.rizky@siswa.belajar.id',
-    studentName: 'Ahmad Rizky Pratama',
-    kelas: '8A',
-    date: new Date().toISOString().split('T')[0],
-    time: '08:15',
-    moodScore: 2,
-    moodLabel: '😔 Sedih',
-    notes: 'Kelelahan kurang tidur dan cemas karena ulangan Matematika.'
-  }
-];
+const DEFAULT_MOODS: MoodEntry[] = [];
 
 // Broadcast channel for multi-tab updates
 let broadcastChannel: BroadcastChannel | null = null;
@@ -220,6 +117,11 @@ export const saveConsultation = (request: ConsultationRequest): void => {
 export const deleteConsultation = (id: string): void => {
   const list = getConsultations().filter(r => r.id !== id);
   localStorage.setItem(STORAGE_KEYS.CONSULTATIONS, JSON.stringify(list));
+  notifyDataChanged('consultations');
+};
+
+export const clearAllConsultations = (): void => {
+  localStorage.setItem(STORAGE_KEYS.CONSULTATIONS, JSON.stringify([]));
   notifyDataChanged('consultations');
 };
 

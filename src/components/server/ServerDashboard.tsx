@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
+import * as XLSX from 'xlsx';
 import { User, SchoolData, Counselor, Student, ConsultationRequest, MoodEntry, ProblemCategory, ConsultationStatus, ChatMessage } from '../../types';
-import { getSchoolData, saveSchoolData, getConsultations, saveConsultation, deleteConsultation, getMoodEntries, subscribeToRealtimeChanges, addChatMessage, isWhitelistedCounselorEmail } from '../../services/storage';
+import { getSchoolData, saveSchoolData, getConsultations, saveConsultation, deleteConsultation, clearAllConsultations, getMoodEntries, subscribeToRealtimeChanges, addChatMessage, isWhitelistedCounselorEmail } from '../../services/storage';
 import { exportStudentsToCSV, exportConsultationsToCSV, generateGoogleAppsScriptCode, syncToGoogleSheetsWebhook } from '../../services/googleSheets';
-import { Shield, Users, School, MessageSquare, FileSpreadsheet, Sparkles, Send, Plus, Search, CheckCircle2, AlertCircle, FileText, Download, Copy, Trash2, Edit, Check, RefreshCw, Layers } from 'lucide-react';
+import { Shield, Users, School, MessageSquare, FileSpreadsheet, Sparkles, Send, Plus, Search, CheckCircle2, AlertCircle, FileText, Download, Copy, Trash2, Edit, Check, RefreshCw, Layers, UserPlus, Wand2, FilePlus, UserX, Trash, Upload, FileType, Table } from 'lucide-react';
 
 interface ServerDashboardProps {
   currentUser: User;
@@ -13,8 +14,8 @@ export const ServerDashboard: React.FC<ServerDashboardProps> = ({ currentUser })
   const [consultations, setConsultations] = useState<ConsultationRequest[]>(getConsultations());
   const [moodEntries, setMoodEntries] = useState<MoodEntry[]>(getMoodEntries());
 
-  // Active Main Subtab: 'live_chat' | 'data_sekolah' | 'hasil_masalah' | 'google_sheets' | 'ai_assistant'
-  const [activeTab, setActiveTab] = useState<'live_chat' | 'data_sekolah' | 'hasil_masalah' | 'google_sheets' | 'ai_assistant'>('live_chat');
+  // Active Main Subtab: 'live_chat' | 'data_sekolah' | 'hasil_masalah' | 'google_sheets'
+  const [activeTab, setActiveTab] = useState<'live_chat' | 'data_sekolah' | 'hasil_masalah' | 'google_sheets'>('live_chat');
 
   // Filter States
   const [statusFilter, setStatusFilter] = useState<string>('Semua');
@@ -45,23 +46,33 @@ export const ServerDashboard: React.FC<ServerDashboardProps> = ({ currentUser })
   const [searchStudent, setSearchStudent] = useState('');
   const [filterClassStudent, setFilterClassStudent] = useState('Semua');
   const [showAddStudentModal, setShowAddStudentModal] = useState(false);
+  const [addStudentTab, setAddStudentTab] = useState<'excel' | 'batch_text' | 'batch_auto' | 'single'>('excel');
+  
+  // Excel / CSV Upload State
+  const [excelFileName, setExcelFileName] = useState('');
+  const [excelParsedStudents, setExcelParsedStudents] = useState<Student[]>([]);
+  const [excelDefaultClass, setExcelDefaultClass] = useState('8A');
+  const [excelErrorMsg, setExcelErrorMsg] = useState<string | null>(null);
+
+  // Single Student State
   const [newStudentName, setNewStudentName] = useState('');
   const [newStudentNisn, setNewStudentNisn] = useState('');
   const [newStudentClass, setNewStudentClass] = useState('7A');
   const [newStudentAbsen, setNewStudentAbsen] = useState('01');
   const [newStudentEmail, setNewStudentEmail] = useState('');
 
+  // Batch Students State
+  const [batchTextNames, setBatchTextNames] = useState('');
+  const [batchTextClass, setBatchTextClass] = useState('8A');
+  const [autoGenClass, setAutoGenClass] = useState('8A');
+  const [autoGenCount, setAutoGenCount] = useState<number>(10);
+  const [autoGenNaming, setAutoGenNaming] = useState<'random_names' | 'numbered'>('random_names');
+
   // Google Sheets Config State
   const [webhookUrl, setWebhookUrl] = useState(schoolData.googleSheetUrl || '');
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatusMsg, setSyncStatusMsg] = useState<string | null>(null);
   const [copiedScript, setCopiedScript] = useState(false);
-
-  // Gemini AI Assistant State
-  const [aiProblemText, setAiProblemText] = useState('');
-  const [aiCategory, setAiCategory] = useState<ProblemCategory>('Belajar');
-  const [aiResult, setAiResult] = useState<string | null>(null);
-  const [isLoadingAi, setIsLoadingAi] = useState(false);
 
   // Realtime Sync Subscription
   const refreshData = () => {
@@ -185,6 +196,36 @@ export const ServerDashboard: React.FC<ServerDashboardProps> = ({ currentUser })
     refreshData();
   };
 
+  // Clear All Consultations
+  const handleClearAllConsultations = () => {
+    if (window.confirm('Apakah Anda yakin ingin MENGHAPUS SELURUH data contoh konseling siswa?')) {
+      clearAllConsultations();
+      setActiveConsultationId(null);
+      refreshData();
+      alert('Seluruh data contoh konseling siswa telah dihapus.');
+    }
+  };
+
+  // Delete Single Student
+  const handleDeleteStudent = (studentId: string, studentName: string) => {
+    if (window.confirm(`Apakah Anda yakin ingin menghapus siswa "${studentName}"?`)) {
+      const updatedStudents = schoolData.students.filter(s => s.id !== studentId);
+      const updated = { ...schoolData, students: updatedStudents };
+      saveSchoolData(updated);
+      refreshData();
+    }
+  };
+
+  // Delete All Students
+  const handleDeleteAllStudents = () => {
+    if (window.confirm('Apakah Anda yakin ingin MENGHAPUS SELURUH Master Data Siswa?')) {
+      const updated = { ...schoolData, students: [] };
+      saveSchoolData(updated);
+      refreshData();
+      alert('Seluruh master data siswa berhasil dikosongkan.');
+    }
+  };
+
   // Add Master Student
   const handleAddStudent = (e: React.FormEvent) => {
     e.preventDefault();
@@ -192,7 +233,7 @@ export const ServerDashboard: React.FC<ServerDashboardProps> = ({ currentUser })
 
     const newStudent: Student = {
       id: `s-${Date.now()}`,
-      nisn: newStudentNisn.trim() || `008${Math.floor(100000 + Math.random() * 900000)}`,
+      nisn: newStudentNisn.trim() || `008${Math.floor(1000000 + Math.random() * 9000000)}`,
       name: newStudentName.trim(),
       kelas: newStudentClass,
       absen: newStudentAbsen,
@@ -213,6 +254,248 @@ export const ServerDashboard: React.FC<ServerDashboardProps> = ({ currentUser })
     refreshData();
   };
 
+  // Add Batch Students from Multi-Line Text / Paste List
+  const handleAddBatchTextStudents = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!batchTextNames.trim()) return;
+
+    const lines = batchTextNames.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    if (lines.length === 0) return;
+
+    const newStudentsList: Student[] = [];
+    let startAbsen = 1;
+
+    const existingInClass = schoolData.students.filter(s => s.kelas === batchTextClass);
+    if (existingInClass.length > 0) {
+      const maxAbsen = Math.max(...existingInClass.map(s => parseInt(s.absen) || 0));
+      if (maxAbsen > 0) startAbsen = maxAbsen + 1;
+    }
+
+    lines.forEach((line, idx) => {
+      const parts = line.split(',').map(p => p.trim());
+      let name = line;
+      let sClass = batchTextClass;
+      let sAbsen = String(startAbsen + idx).padStart(2, '0');
+      let sEmail = '';
+      let sNisn = '';
+
+      if (parts.length >= 2 && (parts[1].match(/^[789][A-Za-z]$/) || parts[1].length <= 3)) {
+        name = parts[0];
+        sClass = parts[1];
+        if (parts[2]) sAbsen = parts[2].padStart(2, '0');
+        if (parts[3]) sEmail = parts[3];
+        if (parts[4]) sNisn = parts[4];
+      }
+
+      if (!sEmail) {
+        const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '.').replace(/\.+/g, '.');
+        sEmail = `${cleanName}@siswa.belajar.id`;
+      }
+
+      if (!sNisn) {
+        sNisn = `008${Math.floor(1000000 + Math.random() * 9000000)}`;
+      }
+
+      newStudentsList.push({
+        id: `s-${Date.now()}-${idx}`,
+        nisn: sNisn,
+        name: name,
+        kelas: sClass,
+        absen: sAbsen,
+        email: sEmail.toLowerCase(),
+        notes: 'Siswa ditambahkan via Tambah Banyak Massal',
+      });
+    });
+
+    const updated = {
+      ...schoolData,
+      students: [...newStudentsList, ...schoolData.students],
+    };
+
+    saveSchoolData(updated);
+    setShowAddStudentModal(false);
+    setBatchTextNames('');
+    alert(`Berhasil menambahkan ${newStudentsList.length} siswa baru ke Master Data Sekolah!`);
+    refreshData();
+  };
+
+  // Auto Generate Students
+  const handleAutoGenerateStudents = (e: React.FormEvent) => {
+    e.preventDefault();
+    const count = Math.min(Math.max(autoGenCount, 1), 100);
+
+    const FIRST_NAMES = [
+      'Aditia', 'Anisa', 'Bayu', 'Cantika', 'Denis', 'Fajar', 'Gita', 'Hafiz', 'Intan',
+      'Joko', 'Kartika', 'Laras', 'Muhammad', 'Nabila', 'Okta', 'Putri', 'Rizky', 'Salsabila',
+      'Taufik', 'Utami', 'Vina', 'Wahyu', 'Yulia', 'Zaki', 'Aris', 'Bunga', 'Dedi', 'Eka'
+    ];
+    const LAST_NAMES = [
+      'Pratama', 'Nugraha', 'Putra', 'Putri', 'Sari', 'Wibowo', 'Santoso', 'Saputra',
+      'Hidayat', 'Kurniawan', 'Ramadhan', 'Wijaya', 'Permana', 'Setiawan', 'Riyadi'
+    ];
+
+    const newStudentsList: Student[] = [];
+    const existingInClass = schoolData.students.filter(s => s.kelas === autoGenClass);
+    let startAbsen = existingInClass.length + 1;
+
+    for (let i = 0; i < count; i++) {
+      let name = '';
+      if (autoGenNaming === 'numbered') {
+        name = `Siswa ${autoGenClass} ${String(startAbsen + i).padStart(2, '0')}`;
+      } else {
+        const fName = FIRST_NAMES[Math.floor(Math.random() * FIRST_NAMES.length)];
+        const lName = LAST_NAMES[Math.floor(Math.random() * LAST_NAMES.length)];
+        name = `${fName} ${lName}`;
+      }
+
+      const sAbsen = String(startAbsen + i).padStart(2, '0');
+      const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '.').replace(/\.+/g, '.');
+      const sEmail = `${cleanName}.${autoGenClass.toLowerCase()}@siswa.belajar.id`;
+      const sNisn = `008${Math.floor(1000000 + Math.random() * 9000000)}`;
+
+      newStudentsList.push({
+        id: `s-${Date.now()}-${i}`,
+        nisn: sNisn,
+        name: name,
+        kelas: autoGenClass,
+        absen: sAbsen,
+        email: sEmail,
+        notes: 'Siswa buatan otomatis (Auto Generated Batch)',
+      });
+    }
+
+    const updated = {
+      ...schoolData,
+      students: [...newStudentsList, ...schoolData.students],
+    };
+
+    saveSchoolData(updated);
+    setShowAddStudentModal(false);
+    alert(`Berhasil meng-generate ${count} siswa otomatis untuk Kelas ${autoGenClass}!`);
+    refreshData();
+  };
+
+  // Process uploaded Excel / CSV File
+  const processExcelFile = async (file: File) => {
+    setExcelFileName(file.name);
+    setExcelErrorMsg(null);
+    setExcelParsedStudents([]);
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: 'array' });
+      if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+        setExcelErrorMsg('File Excel/CSV tidak memiliki lembar kerja (sheet).');
+        return;
+      }
+
+      const firstSheetName = workbook.SheetNames[0];
+      const sheet = workbook.Sheets[firstSheetName];
+      const rawJson: any[] = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+      if (!rawJson || rawJson.length === 0) {
+        setExcelErrorMsg('File Excel/CSV kosong atau tidak berisi data.');
+        return;
+      }
+
+      const parsedList: Student[] = [];
+
+      rawJson.forEach((row, idx) => {
+        const keys = Object.keys(row);
+        const findVal = (possibleHeaders: string[]) => {
+          for (const header of possibleHeaders) {
+            const key = keys.find(k => k.trim().toLowerCase() === header.toLowerCase());
+            if (key && row[key] !== undefined && row[key] !== null && String(row[key]).trim() !== '') {
+              return String(row[key]).trim();
+            }
+          }
+          return '';
+        };
+
+        const name = findVal(['nama', 'nama siswa', 'nama_lengkap', 'name', 'student name', 'siswa']) || 
+                     (keys[0] ? String(row[keys[0]]).trim() : '');
+        
+        // Skip header-like rows or empty names
+        if (!name || name.toLowerCase() === 'nama' || name.toLowerCase() === 'nama siswa' || name.toLowerCase() === 'name') {
+          return;
+        }
+
+        const sClass = findVal(['kelas', 'class', 'kel', 'tingkat']) || excelDefaultClass;
+        const sAbsen = findVal(['absen', 'no absen', 'no_absen', 'nomor absen', 'no', 'nr']) || String(idx + 1).padStart(2, '0');
+        let sEmail = findVal(['email', 'email google', 'email siswa', 'gmail', 'mail']);
+        let sNisn = findVal(['nisn', 'nis', 'no nisn']);
+
+        if (!sEmail) {
+          const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '.').replace(/\.+/g, '.');
+          sEmail = `${cleanName}.${sClass.toLowerCase()}@siswa.belajar.id`;
+        }
+
+        if (!sNisn) {
+          sNisn = `008${Math.floor(1000000 + Math.random() * 9000000)}`;
+        }
+
+        parsedList.push({
+          id: `s-excel-${Date.now()}-${idx}`,
+          nisn: sNisn,
+          name: name,
+          kelas: sClass,
+          absen: String(sAbsen).padStart(2, '0'),
+          email: sEmail.toLowerCase(),
+          notes: `Imported via Excel (${file.name})`,
+        });
+      });
+
+      if (parsedList.length === 0) {
+        setExcelErrorMsg('Tidak ada baris siswa yang valid ditemukan dalam file Excel/CSV.');
+      } else {
+        setExcelParsedStudents(parsedList);
+      }
+    } catch (err: any) {
+      console.error('Excel Import Error:', err);
+      setExcelErrorMsg(`Gagal membaca file Excel/CSV: ${err.message || 'Format file tidak didukung.'}`);
+    }
+  };
+
+  const handleExcelFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      processExcelFile(file);
+    }
+  };
+
+  const handleImportExcelStudents = () => {
+    if (excelParsedStudents.length === 0) return;
+
+    const updated = {
+      ...schoolData,
+      students: [...excelParsedStudents, ...schoolData.students],
+    };
+
+    saveSchoolData(updated);
+    setShowAddStudentModal(false);
+    alert(`Berhasil mengimpor ${excelParsedStudents.length} data siswa dari file ${excelFileName}!`);
+    setExcelParsedStudents([]);
+    setExcelFileName('');
+    refreshData();
+  };
+
+  const downloadSampleExcelTemplate = () => {
+    const csvContent = "Nama,Kelas,Absen,Email,NISN\n" +
+      "Ahmad Rizky Pratama,8A,01,ahmad.rizky.8a@siswa.belajar.id,0081234567\n" +
+      "Anisa Fitriani,8A,02,anisa.fitriani.8a@siswa.belajar.id,0081234568\n" +
+      "Budi Santoso,8A,03,budi.santoso.8a@siswa.belajar.id,0081234569\n" +
+      "Citra Dewi,8B,01,citra.dewi.8b@siswa.belajar.id,0081234570\n";
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'Template_Master_Siswa_BK.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   // Google Sheets Webhook Sync
   const handleSyncSheets = async () => {
     setIsSyncing(true);
@@ -227,39 +510,6 @@ export const ServerDashboard: React.FC<ServerDashboardProps> = ({ currentUser })
       googleSheetUrl: webhookUrl,
     };
     saveSchoolData(updated);
-  };
-
-  // Call Gemini AI Endpoint
-  const handleGenerateAiCounselingSuggestion = async () => {
-    if (!aiProblemText.trim()) return;
-    setIsLoadingAi(true);
-    setAiResult(null);
-
-    try {
-      const response = await fetch('/api/ai-counselor-suggest', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          category: aiCategory,
-          title: 'Kasus Bimbingan Konseling Siswa',
-          problemDescription: aiProblemText,
-          studentName: selectedConsultation ? selectedConsultation.studentName : 'Siswa',
-          kelas: selectedConsultation ? selectedConsultation.kelas : 'SMP',
-          moodToday: selectedConsultation?.moodToday || 'Netral',
-        }),
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        setAiResult(data.suggestion);
-      } else {
-        setAiResult(`Gagal mendapatkan analisis AI: ${data.error || 'Terjadi kesalahan'}`);
-      }
-    } catch (err: any) {
-      setAiResult(`Error koneksi ke server AI: ${err.message}`);
-    } finally {
-      setIsLoadingAi(false);
-    }
   };
 
   return (
@@ -361,19 +611,6 @@ export const ServerDashboard: React.FC<ServerDashboardProps> = ({ currentUser })
           <FileSpreadsheet className="w-4 h-4 text-slate-950" />
           <span>Integrasi Google Sheet</span>
         </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('ai_assistant')}
-          className={`py-3 px-5 rounded-xl text-xs sm:text-sm font-black uppercase transition whitespace-nowrap flex items-center gap-2 cursor-pointer border-2 ${
-            activeTab === 'ai_assistant'
-              ? 'bg-indigo-600 text-white border-slate-900 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)]'
-              : 'border-transparent text-slate-700 hover:bg-slate-100'
-          }`}
-        >
-          <Sparkles className="w-4 h-4 text-amber-300" />
-          <span>AI Konselor Assistant</span>
-        </button>
       </div>
 
       {/* SUBTAB 1: KONSULTASI SISWA & LIVE CHAT */}
@@ -395,10 +632,10 @@ export const ServerDashboard: React.FC<ServerDashboardProps> = ({ currentUser })
               </select>
             </div>
 
-            <div className="space-y-2.5 max-h-[620px] overflow-y-auto pr-1">
+            <div className="space-y-2.5 max-h-[580px] overflow-y-auto pr-1">
               {filteredConsultations.length === 0 ? (
-                <div className="text-center py-12 text-slate-400 font-bold text-xs">
-                  Tidak ada permintaan konsultasi dengan status ini.
+                <div className="text-center py-12 text-slate-400 font-bold text-xs space-y-2">
+                  <div>Belum ada permintaan konsultasi siswa.</div>
                 </div>
               ) : (
                 filteredConsultations.map((req) => (
@@ -442,6 +679,19 @@ export const ServerDashboard: React.FC<ServerDashboardProps> = ({ currentUser })
                 ))
               )}
             </div>
+
+            {consultations.length > 0 && (
+              <div className="pt-2 border-t-2 border-slate-200">
+                <button
+                  type="button"
+                  onClick={handleClearAllConsultations}
+                  className="w-full py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 font-black text-xs uppercase rounded-xl border-2 border-slate-900 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Hapus Semua Contoh Konseling</span>
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Active Live Chat Window & Otomatisasi Input Masalah (8 cols) */}
@@ -744,22 +994,32 @@ export const ServerDashboard: React.FC<ServerDashboardProps> = ({ currentUser })
                 <h2 className="text-2xl font-black uppercase tracking-tight text-slate-950">Data Master Seluruh Siswa ({schoolData.students.length})</h2>
                 <p className="text-xs font-bold text-slate-600 mt-0.5">Daftar seluruh siswa terdaftar untuk layanan Bimbingan Konseling</p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                {schoolData.students.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleDeleteAllStudents}
+                    className="px-3 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-black uppercase rounded-xl text-xs border-2 border-slate-900 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] transition flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span>Hapus Semua Siswa</span>
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={exportStudentsToCSV}
                   className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-950 font-black uppercase rounded-xl text-xs border-2 border-slate-900 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] transition flex items-center gap-1.5 cursor-pointer"
                 >
                   <Download className="w-4 h-4" />
-                  <span>Export CSV Data Siswa</span>
+                  <span>Export CSV</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowAddStudentModal(true)}
                   className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase rounded-xl text-xs border-2 border-slate-900 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] transition flex items-center gap-1.5 cursor-pointer"
                 >
-                  <Plus className="w-4 h-4" />
-                  <span>Tambah Siswa Baru</span>
+                  <UserPlus className="w-4 h-4 text-emerald-300" />
+                  <span>+ Tambah Siswa (Banyak/Otomatis)</span>
                 </button>
               </div>
             </div>
@@ -805,6 +1065,7 @@ export const ServerDashboard: React.FC<ServerDashboardProps> = ({ currentUser })
                     <th className="p-3">Absen</th>
                     <th className="p-3">Email Google</th>
                     <th className="p-3">Catatan Khusus</th>
+                    <th className="p-3 text-center">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y-2 divide-slate-200 bg-white">
@@ -825,6 +1086,16 @@ export const ServerDashboard: React.FC<ServerDashboardProps> = ({ currentUser })
                         <td className="p-3 font-bold text-slate-700">{s.absen}</td>
                         <td className="p-3 font-mono text-slate-600 font-medium">{s.email}</td>
                         <td className="p-3 text-slate-600 font-medium">{s.notes || '-'}</td>
+                        <td className="p-3 text-center">
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteStudent(s.id, s.name)}
+                            className="p-1.5 bg-rose-100 hover:bg-rose-200 text-rose-800 rounded-lg border border-slate-900 transition cursor-pointer"
+                            title="Hapus Siswa"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
                       </tr>
                     ))}
                 </tbody>
@@ -844,14 +1115,26 @@ export const ServerDashboard: React.FC<ServerDashboardProps> = ({ currentUser })
                 Rekapitulasi lengkap hasil penanganan masalah siswa oleh Guru BK
               </p>
             </div>
-            <button
-              type="button"
-              onClick={exportConsultationsToCSV}
-              className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black uppercase rounded-xl text-xs border-2 border-slate-900 shadow-[3px_3px_0px_0px_rgba(15,23,42,1)] transition flex items-center gap-1.5 cursor-pointer"
-            >
-              <Download className="w-4 h-4" />
-              <span>Export Hasil Input Masalah (CSV/Excel)</span>
-            </button>
+            <div className="flex items-center gap-2">
+              {consultations.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleClearAllConsultations}
+                  className="px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-black uppercase rounded-xl text-xs border-2 border-slate-900 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Kosongkan/Hapus Data Konseling</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={exportConsultationsToCSV}
+                className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black uppercase rounded-xl text-xs border-2 border-slate-900 shadow-[3px_3px_0px_0px_rgba(15,23,42,1)] transition flex items-center gap-1.5 cursor-pointer"
+              >
+                <Download className="w-4 h-4" />
+                <span>Export Hasil Input Masalah (CSV/Excel)</span>
+              </button>
+            </div>
           </div>
 
           <div className="overflow-x-auto rounded-2xl border-3 border-slate-900 shadow-[4px_4px_0px_0px_rgba(15,23,42,1)]">
@@ -994,169 +1277,420 @@ export const ServerDashboard: React.FC<ServerDashboardProps> = ({ currentUser })
             </div>
           </div>
         </div>
-      )}
-
-      {/* SUBTAB 5: AI KONSELOR ASSISTANT (GEMINI) */}
-      {activeTab === 'ai_assistant' && (
-        <div className="bg-white rounded-[2rem] p-6 md:p-8 border-4 border-slate-900 shadow-[8px_8px_0px_0px_rgba(15,23,42,1)] space-y-6">
-          <div className="border-b-2 border-slate-200 pb-3 flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-black uppercase tracking-tight text-slate-950 flex items-center gap-2">
-                <Sparkles className="w-7 h-7 text-indigo-600" />
-                <span>AI Konselor Assistant (Gemini AI)</span>
-              </h2>
-              <p className="text-xs font-bold text-slate-600 mt-0.5">
-                Dapatkan analisis psikologis, rekomendasi pendekatan konseling, dan draf pertanyaan reflektif untuk kasus siswa secara cepat.
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-black text-slate-900 uppercase mb-1">
-                  Pilih Kategori Permasalahan
-                </label>
-                <select
-                  value={aiCategory}
-                  onChange={(e) => setAiCategory(e.target.value as ProblemCategory)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border-2 border-slate-900 text-xs font-bold focus:outline-none focus:border-indigo-600 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)]"
-                >
-                  <option value="Belajar">Bimbingan Belajar & Akademik</option>
-                  <option value="Pribadi">Bimbingan Pribadi & Perilaku</option>
-                  <option value="Sosial">Bimbingan Sosial & Pertemanan</option>
-                  <option value="Karir">Bimbingan Karir & Studi Lanjut</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-black text-slate-900 uppercase mb-1">
-                  Deskripsi / Kasus Masalah Siswa
-                </label>
-                <textarea
-                  rows={6}
-                  value={aiProblemText}
-                  onChange={(e) => setAiProblemText(e.target.value)}
-                  placeholder="Ketikkan gejala masalah siswa di sini, misal: 'Siswa kelas 8 sering membolos pada pelajaran Matematika, sering merasa cemas saat dipanggil guru, dan nilai rapor menurun...'"
-                  className="w-full px-3.5 py-2.5 rounded-xl border-2 border-slate-900 text-xs font-medium focus:outline-none focus:border-indigo-600 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)]"
-                />
-              </div>
-
+      )}      {/* Modal Add Student (Excel, Batch Text Paste, Batch Auto Generate, or Single) */}
+      {showAddStudentModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 overflow-y-auto">
+          <div className="bg-white rounded-[2rem] max-w-xl w-full p-6 space-y-4 shadow-[12px_12px_0px_0px_rgba(15,23,42,1)] border-4 border-slate-900 my-8">
+            <div className="flex items-center justify-between border-b-2 border-slate-200 pb-3">
+              <h3 className="font-black text-lg uppercase text-slate-950 flex items-center gap-2">
+                <UserPlus className="w-5 h-5 text-indigo-600" />
+                <span>Tambah Siswa Baru</span>
+              </h3>
               <button
                 type="button"
-                onClick={handleGenerateAiCounselingSuggestion}
-                disabled={isLoadingAi || !aiProblemText.trim()}
-                className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase tracking-wider rounded-2xl text-xs border-3 border-slate-900 shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 active:translate-y-[1px]"
+                onClick={() => setShowAddStudentModal(false)}
+                className="font-black text-slate-500 hover:text-slate-900 text-lg cursor-pointer"
               >
-                <Sparkles className={`w-4 h-4 text-amber-300 ${isLoadingAi ? 'animate-spin' : ''}`} />
-                <span>{isLoadingAi ? 'Memproses Strategi AI...' : 'Hasilkan Strategi Penanganan Konselor'}</span>
+                ✕
               </button>
             </div>
 
-            {/* AI Result Box */}
-            <div className="bg-amber-50 rounded-2xl p-5 border-3 border-slate-900 shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] space-y-3">
-              <div className="font-black text-xs uppercase tracking-wider text-slate-950 border-b-2 border-slate-900/20 pb-2">
-                Hasil Analisis & Rekomendasi Konseling AI
-              </div>
-              {isLoadingAi ? (
-                <div className="py-16 text-center space-y-3">
-                  <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto" />
-                  <p className="text-xs text-slate-700 font-bold">Gemini AI sedang menganalisis kasus konseling siswa...</p>
-                </div>
-              ) : aiResult ? (
-                <div className="prose prose-xs max-w-none text-slate-900 font-medium text-xs leading-relaxed overflow-y-auto max-h-[400px] whitespace-pre-wrap">
-                  {aiResult}
-                </div>
-              ) : (
-                <div className="py-16 text-center text-slate-500 font-bold text-xs">
-                  Masukkan deskripsi masalah siswa di sebelah kiri dan klik tombol untuk menghasilkan panduan strategi konseling dari AI.
-                </div>
-              )}
+            {/* Modal Tabs */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 bg-slate-100 p-1 rounded-xl border-2 border-slate-900 font-black text-xs">
+              <button
+                type="button"
+                onClick={() => setAddStudentTab('excel')}
+                className={`py-2 px-1 rounded-lg transition flex items-center justify-center gap-1 cursor-pointer ${
+                  addStudentTab === 'excel'
+                    ? 'bg-emerald-500 text-slate-950 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)]'
+                    : 'text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                <span>File Excel/CSV</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setAddStudentTab('batch_text')}
+                className={`py-2 px-1 rounded-lg transition flex items-center justify-center gap-1 cursor-pointer ${
+                  addStudentTab === 'batch_text'
+                    ? 'bg-indigo-600 text-white shadow-[2px_2px_0px_0px_rgba(15,23,42,1)]'
+                    : 'text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                <FilePlus className="w-3.5 h-3.5" />
+                <span>Tempel Teks</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setAddStudentTab('batch_auto')}
+                className={`py-2 px-1 rounded-lg transition flex items-center justify-center gap-1 cursor-pointer ${
+                  addStudentTab === 'batch_auto'
+                    ? 'bg-indigo-600 text-white shadow-[2px_2px_0px_0px_rgba(15,23,42,1)]'
+                    : 'text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                <Wand2 className="w-3.5 h-3.5 text-amber-300" />
+                <span>Auto Generate</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setAddStudentTab('single')}
+                className={`py-2 px-1 rounded-lg transition flex items-center justify-center gap-1 cursor-pointer ${
+                  addStudentTab === 'single'
+                    ? 'bg-indigo-600 text-white shadow-[2px_2px_0px_0px_rgba(15,23,42,1)]'
+                    : 'text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                <span>Input 1 Siswa</span>
+              </button>
             </div>
-          </div>
-        </div>
-      )}
 
-      {/* Modal Add Student */}
-      {showAddStudentModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4">
-          <div className="bg-white rounded-[2rem] max-w-md w-full p-6 space-y-4 shadow-[12px_12px_0px_0px_rgba(15,23,42,1)] border-4 border-slate-900">
-            <h3 className="font-black text-lg uppercase text-slate-950 border-b-2 border-slate-200 pb-2">Tambah Data Siswa Baru</h3>
-            <form onSubmit={handleAddStudent} className="space-y-3 text-xs">
-              <div>
-                <label className="block font-black uppercase text-slate-900 mb-1">Nama Lengkap Siswa</label>
-                <input
-                  type="text"
-                  value={newStudentName}
-                  onChange={(e) => setNewStudentName(e.target.value)}
-                  className="w-full px-3 py-2 border-2 border-slate-900 rounded-xl font-bold"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block font-black uppercase text-slate-900 mb-1">Email Google / Gmail Siswa</label>
-                <input
-                  type="email"
-                  value={newStudentEmail}
-                  onChange={(e) => setNewStudentEmail(e.target.value)}
-                  className="w-full px-3 py-2 border-2 border-slate-900 rounded-xl font-bold"
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
+            {/* TAB 0: UPLOAD EXCEL / CSV */}
+            {addStudentTab === 'excel' && (
+              <div className="space-y-4 text-xs">
+                <div className="bg-emerald-50 p-3 rounded-xl border-2 border-slate-900 space-y-1.5">
+                  <div className="font-black text-emerald-950 uppercase flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <FileSpreadsheet className="w-4 h-4 text-emerald-700" />
+                      <span>Import File Excel (.xlsx / .xls) atau CSV</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={downloadSampleExcelTemplate}
+                      className="text-[10px] font-black bg-white hover:bg-emerald-100 text-emerald-900 px-2.5 py-1 rounded-lg border border-slate-900 shadow-[1px_1px_0px_0px_rgba(15,23,42,1)] flex items-center gap-1 cursor-pointer"
+                    >
+                      <Download className="w-3 h-3 text-emerald-700" />
+                      <span>Template CSV</span>
+                    </button>
+                  </div>
+                  <p className="text-[11px] font-bold text-slate-700 leading-relaxed">
+                    Upload file spreadsheet dengan kolom header: <strong>Nama</strong>, <strong>Kelas</strong>, <strong>Absen</strong>, <strong>Email</strong>, <strong>NISN</strong>.
+                  </p>
+                </div>
+
                 <div>
-                  <label className="block font-black uppercase text-slate-900 mb-1">Kelas</label>
+                  <label className="block font-black uppercase text-slate-900 mb-1">Pilih Kelas Default (Jika tidak ada kolom kelas)</label>
                   <select
-                    value={newStudentClass}
-                    onChange={(e) => setNewStudentClass(e.target.value)}
-                    className="w-full px-3 py-2 border-2 border-slate-900 rounded-xl font-bold"
+                    value={excelDefaultClass}
+                    onChange={(e) => setExcelDefaultClass(e.target.value)}
+                    className="w-full px-3 py-2 border-2 border-slate-900 rounded-xl font-bold bg-white"
                   >
-                    <option value="7A">7A</option>
-                    <option value="7B">7B</option>
-                    <option value="8A">8A</option>
-                    <option value="8B">8B</option>
-                    <option value="9A">9A</option>
-                    <option value="9B">9B</option>
-                    <option value="9C">9C</option>
+                    <option value="7A">Kelas 7A</option>
+                    <option value="7B">Kelas 7B</option>
+                    <option value="8A">Kelas 8A</option>
+                    <option value="8B">Kelas 8B</option>
+                    <option value="9A">Kelas 9A</option>
+                    <option value="9B">Kelas 9B</option>
+                    <option value="9C">Kelas 9C</option>
                   </select>
                 </div>
+
+                {/* File Input Zone */}
+                <div className="border-3 border-dashed border-slate-400 hover:border-indigo-600 rounded-2xl p-6 text-center bg-slate-50 hover:bg-indigo-50/40 transition cursor-pointer relative group">
+                  <input
+                    type="file"
+                    accept=".xlsx, .xls, .csv"
+                    onChange={handleExcelFileChange}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                  />
+                  <div className="space-y-2 pointer-events-none">
+                    <Upload className="w-8 h-8 text-indigo-600 mx-auto group-hover:scale-110 transition-transform" />
+                    <div>
+                      <span className="font-black text-slate-900 text-sm">Klik atau Seret File Excel / CSV di Sini</span>
+                      <p className="text-[11px] text-slate-500 font-bold mt-0.5">Mendukung file .xlsx, .xls, dan .csv</p>
+                    </div>
+                    {excelFileName && (
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-100 text-indigo-900 border border-indigo-400 rounded-lg text-xs font-black">
+                        <FileType className="w-3.5 h-3.5 text-indigo-700" />
+                        <span>File Terpilih: {excelFileName}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Error message */}
+                {excelErrorMsg && (
+                  <div className="p-3 bg-rose-50 border-2 border-rose-400 text-rose-950 font-bold rounded-xl text-xs flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                    <span>{excelErrorMsg}</span>
+                  </div>
+                )}
+
+                {/* Parsed Preview Table */}
+                {excelParsedStudents.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between font-black text-slate-950 uppercase text-xs">
+                      <span>Pratinjau Hasil Pembacaan ({excelParsedStudents.length} Siswa)</span>
+                      <span className="text-[10px] text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-400 font-black">✓ Siap Diimpor</span>
+                    </div>
+                    <div className="max-h-48 overflow-y-auto border-2 border-slate-900 rounded-xl bg-white text-[11px]">
+                      <table className="w-full text-left">
+                        <thead className="bg-slate-100 border-b-2 border-slate-900 font-black uppercase text-[10px] sticky top-0">
+                          <tr>
+                            <th className="p-2 border-r border-slate-300">Absen</th>
+                            <th className="p-2 border-r border-slate-300">Nama Siswa</th>
+                            <th className="p-2 border-r border-slate-300">Kelas</th>
+                            <th className="p-2 border-r border-slate-300">NISN</th>
+                            <th className="p-2">Email</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200 font-medium">
+                          {excelParsedStudents.slice(0, 15).map((s, idx) => (
+                            <tr key={idx} className="hover:bg-slate-50">
+                              <td className="p-2 border-r border-slate-200 font-mono font-bold text-center">{s.absen}</td>
+                              <td className="p-2 border-r border-slate-200 font-bold text-slate-950">{s.name}</td>
+                              <td className="p-2 border-r border-slate-200 font-bold">{s.kelas}</td>
+                              <td className="p-2 border-r border-slate-200 font-mono text-slate-600">{s.nisn}</td>
+                              <td className="p-2 font-mono text-slate-600 truncate max-w-[120px]">{s.email}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      {excelParsedStudents.length > 15 && (
+                        <div className="p-2 text-center text-slate-500 font-bold text-[10px] bg-slate-50 border-t border-slate-200">
+                          ... dan {excelParsedStudents.length - 15} siswa lainnya.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex justify-end gap-2 pt-2 border-t border-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddStudentModal(false)}
+                    className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-950 border-2 border-slate-900 rounded-xl font-black uppercase cursor-pointer text-xs"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleImportExcelStudents}
+                    disabled={excelParsedStudents.length === 0}
+                    className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-slate-950 border-2 border-slate-900 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] rounded-xl font-black uppercase flex items-center gap-1.5 cursor-pointer disabled:opacity-50 text-xs"
+                  >
+                    <FileSpreadsheet className="w-4 h-4 text-slate-950" />
+                    <span>Import {excelParsedStudents.length} Siswa ke Master Data</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 1: BATCH TEXT PASTE */}
+            {addStudentTab === 'batch_text' && (
+              <form onSubmit={handleAddBatchTextStudents} className="space-y-3 text-xs">
+                <div className="bg-amber-50 p-3 rounded-xl border-2 border-slate-900 space-y-1">
+                  <div className="font-black text-amber-900 uppercase">💡 Cara Tambah Banyak Siswa Sekaligus:</div>
+                  <p className="text-[11px] font-bold text-slate-700 leading-snug">
+                    Tempel daftar nama siswa (1 nama per baris). Sistem otomatis membuat NISN, No Absen berurutan, dan Email Google <code className="bg-amber-100 px-1 rounded">@siswa.belajar.id</code>!
+                  </p>
+                </div>
+
                 <div>
-                  <label className="block font-black uppercase text-slate-900 mb-1">Absen</label>
+                  <label className="block font-black uppercase text-slate-900 mb-1">Pilih Kelas Default</label>
+                  <select
+                    value={batchTextClass}
+                    onChange={(e) => setBatchTextClass(e.target.value)}
+                    className="w-full px-3 py-2 border-2 border-slate-900 rounded-xl font-bold bg-white"
+                  >
+                    <option value="7A">Kelas 7A</option>
+                    <option value="7B">Kelas 7B</option>
+                    <option value="8A">Kelas 8A</option>
+                    <option value="8B">Kelas 8B</option>
+                    <option value="9A">Kelas 9A</option>
+                    <option value="9B">Kelas 9B</option>
+                    <option value="9C">Kelas 9C</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-black uppercase text-slate-900 mb-1">Daftar Nama Siswa (1 Nama per Baris)</label>
+                  <textarea
+                    rows={5}
+                    value={batchTextNames}
+                    onChange={(e) => setBatchTextNames(e.target.value)}
+                    placeholder={`Contoh:\nAhmad Rizky Pratama\nBudi Santoso\nCitra Dewi Lestari\nDeni Kurniawan\nEka Putri Rahmawati`}
+                    className="w-full p-3 border-2 border-slate-900 rounded-xl font-mono text-xs font-bold leading-relaxed focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    required
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddStudentModal(false)}
+                    className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-950 border-2 border-slate-900 rounded-xl font-black uppercase cursor-pointer"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-slate-950 border-2 border-slate-900 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] rounded-xl font-black uppercase flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <FilePlus className="w-4 h-4" />
+                    <span>Tambah Semua Siswa Massal</span>
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* TAB 2: BATCH AUTO GENERATE */}
+            {addStudentTab === 'batch_auto' && (
+              <form onSubmit={handleAutoGenerateStudents} className="space-y-3 text-xs">
+                <div className="bg-indigo-50 p-3 rounded-xl border-2 border-slate-900 space-y-1">
+                  <div className="font-black text-indigo-950 uppercase flex items-center gap-1">
+                    <Wand2 className="w-4 h-4 text-indigo-600" />
+                    <span>Generator Siswa Otomatis:</span>
+                  </div>
+                  <p className="text-[11px] font-bold text-slate-700 leading-snug">
+                    Buat puluhan data siswa simulasi lengkap dengan NISN, nama realistis Indonesia / penomoran, dan akun Google secara instant!
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block font-black uppercase text-slate-900 mb-1">Target Kelas</label>
+                    <select
+                      value={autoGenClass}
+                      onChange={(e) => setAutoGenClass(e.target.value)}
+                      className="w-full px-3 py-2 border-2 border-slate-900 rounded-xl font-bold bg-white"
+                    >
+                      <option value="7A">Kelas 7A</option>
+                      <option value="7B">Kelas 7B</option>
+                      <option value="8A">Kelas 8A</option>
+                      <option value="8B">Kelas 8B</option>
+                      <option value="9A">Kelas 9A</option>
+                      <option value="9B">Kelas 9B</option>
+                      <option value="9C">Kelas 9C</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block font-black uppercase text-slate-900 mb-1">Jumlah Siswa</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={autoGenCount}
+                      onChange={(e) => setAutoGenCount(parseInt(e.target.value) || 10)}
+                      className="w-full px-3 py-2 border-2 border-slate-900 rounded-xl font-bold"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-black uppercase text-slate-900 mb-1">Format Nama Siswa</label>
+                  <select
+                    value={autoGenNaming}
+                    onChange={(e) => setAutoGenNaming(e.target.value as 'random_names' | 'numbered')}
+                    className="w-full px-3 py-2 border-2 border-slate-900 rounded-xl font-bold bg-white"
+                  >
+                    <option value="random_names">Nama Indonesia Acak (Contoh: Aditia Pratama, Anisa Sari)</option>
+                    <option value="numbered">Format Penomoran (Contoh: Siswa 8B 01, Siswa 8B 02)</option>
+                  </select>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddStudentModal(false)}
+                    className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-950 border-2 border-slate-900 rounded-xl font-black uppercase cursor-pointer"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white border-2 border-slate-900 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] rounded-xl font-black uppercase flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Wand2 className="w-4 h-4 text-amber-300" />
+                    <span>Generate {autoGenCount} Siswa Otomatis</span>
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* TAB 3: SINGLE STUDENT MANUAL */}
+            {addStudentTab === 'single' && (
+              <form onSubmit={handleAddStudent} className="space-y-3 text-xs">
+                <div>
+                  <label className="block font-black uppercase text-slate-900 mb-1">Nama Lengkap Siswa</label>
                   <input
                     type="text"
-                    value={newStudentAbsen}
-                    onChange={(e) => setNewStudentAbsen(e.target.value)}
+                    value={newStudentName}
+                    onChange={(e) => setNewStudentName(e.target.value)}
+                    placeholder="Contoh: Muhammad Rizky"
+                    className="w-full px-3 py-2 border-2 border-slate-900 rounded-xl font-bold"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block font-black uppercase text-slate-900 mb-1">Email Google / Gmail Siswa</label>
+                  <input
+                    type="email"
+                    value={newStudentEmail}
+                    onChange={(e) => setNewStudentEmail(e.target.value)}
+                    placeholder="contoh@siswa.belajar.id"
+                    className="w-full px-3 py-2 border-2 border-slate-900 rounded-xl font-bold"
+                    required
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block font-black uppercase text-slate-900 mb-1">Kelas</label>
+                    <select
+                      value={newStudentClass}
+                      onChange={(e) => setNewStudentClass(e.target.value)}
+                      className="w-full px-3 py-2 border-2 border-slate-900 rounded-xl font-bold bg-white"
+                    >
+                      <option value="7A">7A</option>
+                      <option value="7B">7B</option>
+                      <option value="8A">8A</option>
+                      <option value="8B">8B</option>
+                      <option value="9A">9A</option>
+                      <option value="9B">9B</option>
+                      <option value="9C">9C</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block font-black uppercase text-slate-900 mb-1">No. Absen</label>
+                    <input
+                      type="text"
+                      value={newStudentAbsen}
+                      onChange={(e) => setNewStudentAbsen(e.target.value)}
+                      className="w-full px-3 py-2 border-2 border-slate-900 rounded-xl font-bold"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block font-black uppercase text-slate-900 mb-1">NISN</label>
+                  <input
+                    type="text"
+                    value={newStudentNisn}
+                    onChange={(e) => setNewStudentNisn(e.target.value)}
+                    placeholder="Otomatis jika dikosongkan"
                     className="w-full px-3 py-2 border-2 border-slate-900 rounded-xl font-bold"
                   />
                 </div>
-              </div>
-              <div>
-                <label className="block font-black uppercase text-slate-900 mb-1">NISN</label>
-                <input
-                  type="text"
-                  value={newStudentNisn}
-                  onChange={(e) => setNewStudentNisn(e.target.value)}
-                  placeholder="008..."
-                  className="w-full px-3 py-2 border-2 border-slate-900 rounded-xl font-bold"
-                />
-              </div>
 
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowAddStudentModal(false)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-950 border-2 border-slate-900 rounded-xl font-black uppercase cursor-pointer"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white border-2 border-slate-900 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] rounded-xl font-black uppercase cursor-pointer"
-                >
-                  Simpan Siswa
-                </button>
-              </div>
-            </form>
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddStudentModal(false)}
+                    className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-950 border-2 border-slate-900 rounded-xl font-black uppercase cursor-pointer"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white border-2 border-slate-900 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] rounded-xl font-black uppercase cursor-pointer"
+                  >
+                    Simpan Siswa
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}

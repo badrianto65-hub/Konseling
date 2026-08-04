@@ -1,6 +1,7 @@
 import React from 'react';
 import { User, UserRole } from '../types';
 import { Shield, GraduationCap, LogOut, RefreshCw, FileSpreadsheet, Sparkles, UserCheck } from 'lucide-react';
+import counselorLogo from '../assets/images/regenerated_image_1785801760360.png';
 
 interface NavbarProps {
   currentUser: User;
@@ -27,18 +28,18 @@ export const Navbar: React.FC<NavbarProps> = ({
         <div className="flex items-center justify-between h-20">
           {/* Brand Logo */}
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-indigo-500 border-2 border-slate-900 flex items-center justify-center text-white font-black text-xl shadow-[3px_3px_0px_0px_rgba(15,23,42,1)]">
-              BK
-            </div>
+            <img
+              src={counselorLogo}
+              alt="Logo Konselor BK"
+              className="w-11 h-11 rounded-2xl border-2 border-slate-900 object-cover shadow-[3px_3px_0px_0px_rgba(15,23,42,1)]"
+              referrerPolicy="no-referrer"
+            />
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-black text-xl tracking-tight text-white uppercase">BK Next G</span>
-                <span className="text-[10px] uppercase font-black tracking-widest px-2.5 py-0.5 rounded-full bg-emerald-400 text-slate-950 border border-slate-900 shadow-[1px_1px_0px_0px_rgba(15,23,42,1)]">
-                  Bento Console
-                </span>
               </div>
               <p className="text-[11px] text-indigo-200 hidden sm:block font-medium">
-                Dikelola oleh Guru BK: <span className="font-bold text-amber-300">badrianto65@guru.smp.belajar.id</span> (Badrianto, S.Pd.)
+                Sistem Informasi & Layanan Bimbingan Konseling Digital Sekolah
               </p>
             </div>
           </div>

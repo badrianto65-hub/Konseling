@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { User, UserRole } from '../types';
 import { isWhitelistedCounselorEmail, saveSchoolData, getSchoolData } from '../services/storage';
 import { ShieldCheck, UserCheck, GraduationCap, AlertCircle, CheckCircle2, ArrowRight, ExternalLink } from 'lucide-react';
+import counselorLogo from '../assets/images/regenerated_image_1785801760360.png';
 
 interface AuthModalProps {
   onLogin: (user: User) => void;
@@ -10,10 +11,10 @@ interface AuthModalProps {
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({ onLogin, isOpen }) => {
-  const [email, setEmail] = useState('badrianto65@guru.smp.belajar.id');
-  const [name, setName] = useState('Badrianto, S.Pd.');
-  const [kelas, setKelas] = useState('8A');
-  const [absen, setAbsen] = useState('01');
+  const [email, setEmail] = useState('');
+  const [name, setName] = useState('');
+  const [kelas, setKelas] = useState('7A');
+  const [absen, setAbsen] = useState('');
   const [nisn, setNisn] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [targetRole, setTargetRole] = useState<UserRole>('server_guru');
@@ -128,9 +129,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onLogin, isOpen }) => {
         {/* Header */}
         <div className="bg-indigo-950 text-white p-6 relative border-b-4 border-slate-900">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-indigo-600 border-2 border-slate-900 flex items-center justify-center font-black text-2xl text-white shadow-[3px_3px_0px_0px_rgba(15,23,42,1)]">
-              BK
-            </div>
+            <img
+              src={counselorLogo}
+              alt="Logo Konselor BK"
+              className="w-12 h-12 rounded-2xl border-2 border-slate-900 object-cover shadow-[3px_3px_0px_0px_rgba(15,23,42,1)]"
+              referrerPolicy="no-referrer"
+            />
             <div>
               <h2 className="text-2xl font-black tracking-tight uppercase">Masuk BK Next G</h2>
               <p className="text-xs text-amber-300 mt-0.5 font-bold">
@@ -228,27 +232,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onLogin, isOpen }) => {
             </div>
           </div>
 
-          {/* Information Banner - Administrator / Manager info */}
-          <div className="mb-6 p-4 bg-indigo-50 border-3 border-slate-900 rounded-2xl shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] flex items-start gap-3.5">
-            <div className="w-10 h-10 rounded-xl bg-indigo-600 border-2 border-slate-900 text-white flex items-center justify-center shrink-0 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)]">
-              <ShieldCheck className="w-6 h-6 text-amber-300" />
-            </div>
-            <div>
-              <div className="text-xs font-black text-slate-950 uppercase tracking-wide">
-                Pengelola Aplikasi Server Guru BK
-              </div>
-              <div className="text-sm font-black text-indigo-950 mt-0.5">
-                Badrianto, S.Pd.
-              </div>
-              <div className="text-xs font-mono font-bold text-indigo-700 mt-0.5">
-                badrianto65@guru.smp.belajar.id
-              </div>
-              <div className="text-[11px] text-slate-600 font-medium mt-1">
-                Aplikasi ini dikelola sepenuhnya oleh konselor terdaftar di atas untuk layanan bimbingan konseling terpadu.
-              </div>
-            </div>
-          </div>
-
           {/* Form manual custom login */}
           <form onSubmit={handleSubmit} className="space-y-4 pt-4 border-t-2 border-slate-200">
             <div>
@@ -262,7 +245,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onLogin, isOpen }) => {
                   setEmail(e.target.value);
                   setError(null);
                 }}
-                placeholder="badrianto65@guru.smp.belajar.id atau nama@gmail.com"
+                placeholder="Ketikkan alamat email Anda (misal: nama@gmail.com atau @belajar.id)"
                 className="w-full px-4 py-2.5 rounded-xl border-2 border-slate-900 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)]"
                 required
               />

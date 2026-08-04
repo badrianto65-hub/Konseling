@@ -52,7 +52,7 @@ export default function App() {
   const handleSwitchRole = (newRole: UserRole) => {
     if (newRole === 'server_guru') {
       if (currentUser && !isWhitelistedCounselorEmail(currentUser.email)) {
-        alert(`Alamat email ${currentUser.email} belum terdaftar di Whitelist Guru BK. Harap login dengan akun Gmail Konselor (misal: badrianto65@guru.smp.belajar.id).`);
+        alert(`Alamat email ${currentUser.email} belum terdaftar di Whitelist Guru BK. Harap login dengan akun Email Konselor yang telah didaftarkan.`);
         setIsAuthModalOpen(true);
         return;
       }

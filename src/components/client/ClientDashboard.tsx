@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { User, SchoolData, ConsultationRequest, MoodEntry, ProblemCategory, ChatMessage } from '../../types';
 import { getSchoolData, getConsultations, saveConsultation, getMoodEntries, saveMoodEntry, subscribeToRealtimeChanges, addChatMessage } from '../../services/storage';
 import { Smile, Frown, Meh, HeartPulse, Send, MessageSquare, PlusCircle, CheckCircle2, Clock, Sparkles, BookOpen, AlertCircle, UserCheck, GraduationCap } from 'lucide-react';
+import counselorLogo from '../../assets/images/regenerated_image_1785801760360.png';
 
 interface ClientDashboardProps {
   currentUser: User;
@@ -175,9 +176,17 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({ currentUser })
       <div className="bg-indigo-900 rounded-[2rem] border-4 border-slate-900 p-6 md:p-8 text-white shadow-[8px_8px_0px_0px_rgba(15,23,42,1)] relative overflow-hidden">
         <div className="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
           <div className="md:col-span-2 space-y-3">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-emerald-400 border-2 border-slate-900 text-slate-950 text-xs font-black uppercase tracking-wider shadow-[2px_2px_0px_0px_rgba(15,23,42,1)]">
-              <GraduationCap className="w-4 h-4 text-slate-950" />
-              <span>Aplikasi Client Siswa - BK Next G</span>
+            <div className="flex items-center gap-3">
+              <img
+                src={counselorLogo}
+                alt="Logo Konselor BK"
+                className="w-12 h-12 rounded-2xl border-2 border-slate-900 object-cover shadow-[3px_3px_0px_0px_rgba(15,23,42,1)]"
+                referrerPolicy="no-referrer"
+              />
+              <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-emerald-400 border-2 border-slate-900 text-slate-950 text-xs font-black uppercase tracking-wider shadow-[2px_2px_0px_0px_rgba(15,23,42,1)]">
+                <GraduationCap className="w-4 h-4 text-slate-950" />
+                <span>Aplikasi Client Siswa - BK Next G</span>
+              </div>
             </div>
             <h1 className="text-3xl md:text-4xl font-black tracking-tight uppercase">
               Selamat Datang, {currentUser.name}!

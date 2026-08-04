@@ -1,6 +1,6 @@
 {
   "name": "BK Next G",
-  "description": "Aplikasi Bimbingan & Konseling digital terpadu untuk Guru BK (Server) dan Siswa (Client) dengan Mood Tracker, Live Chat Konseling, Pengelolaan Data Siswa, dan Integrasi Google Sheets.",
+  "description": "Aplikasi Bimbingan & Konseling digital terpadu untuk Guru BK (Server) dan Siswa (Client) dengan Mood Tracker, Live Chat Konseling, Pengelolaan Data Siswa (Import Excel/CSV), dan Integrasi Google Sheets.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": []
 }
