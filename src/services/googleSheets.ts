@@ -7,7 +7,7 @@ export interface SheetExportPayload {
   exportedAt: string;
 }
 
-export const generateGoogleAppsScriptCode = (appUrl: string = 'https://bk-next-g.vercel.app'): string => {
+export const generateGoogleAppsScriptCode = (appUrl: string = typeof window !== 'undefined' ? window.location.origin : 'https://bk-next-g.vercel.app'): string => {
   return `/**
  * Google Apps Script for BK Next G App Integration
  * Cara Menggunakan:

@@ -178,7 +178,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onLogin, isOpen }) => {
               <span>Masuk dengan Google (Gmail / Belajar.id)</span>
             </button>
             <div className="text-[11px] text-center font-bold text-slate-500">
-              Mendukung Login Gmail di Vercel Deployment & Local Cloud
+              Mendukung Login Email Google & Cloud Synchronization
             </div>
           </div>
 
@@ -306,7 +306,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onLogin, isOpen }) => {
               <div className="p-3.5 bg-amber-100 border-2 border-slate-900 rounded-xl text-xs font-bold text-slate-950 flex items-start gap-2.5 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)]">
                 <UserCheck className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
                 <div>
-                  <strong>Sistem Keamanan Whitelist:</strong> Alamat Gmail konselor terverifikasi dapat mengelola Aplikasi Server di Vercel maupun Local Host.
+                  <strong>Sistem Keamanan Whitelist:</strong> Alamat Gmail konselor terverifikasi dapat mengelola Aplikasi Server secara online di Web Cloud.
                 </div>
               </div>
             )}

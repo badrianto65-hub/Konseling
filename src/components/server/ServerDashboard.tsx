@@ -1248,7 +1248,7 @@ export const ServerDashboard: React.FC<ServerDashboardProps> = ({ currentUser })
               <button
                 type="button"
                 onClick={() => {
-                  navigator.clipboard.writeText(generateGoogleAppsScriptCode());
+                  navigator.clipboard.writeText(generateGoogleAppsScriptCode(window.location.origin));
                   setCopiedScript(true);
                   setTimeout(() => setCopiedScript(false), 3000);
                 }}
@@ -1273,7 +1273,7 @@ export const ServerDashboard: React.FC<ServerDashboardProps> = ({ currentUser })
             </ol>
 
             <div className="p-4 bg-slate-950 rounded-2xl border-2 border-slate-900 font-mono text-[11px] text-emerald-400 max-h-48 overflow-y-auto">
-              <pre>{generateGoogleAppsScriptCode()}</pre>
+              <pre>{generateGoogleAppsScriptCode(window.location.origin)}</pre>
             </div>
           </div>
         </div>
